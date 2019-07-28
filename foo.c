@@ -14,6 +14,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 
 int main(void) {
   int     pipefd[2];
@@ -32,6 +33,7 @@ int main(void) {
   if(childpid == 0) {
     // child process
     dup2(pipefd[1], STDOUT_FILENO);
+    close(pipefd[0]);
     close(pipefd[1]);
     
     for(unsigned i=0; i<5 ; i++){
@@ -39,7 +41,10 @@ int main(void) {
       fflush(stdout);
       sleep(1);
     }
-    exit(EXIT_SUCCESS);
+
+    close(STDOUT_FILENO); // explicitly close the pipe
+    sleep(3); // for demo purposes, we do stuff for a while before we actually exit
+    return EXIT_SUCCESS;
   }
   else {
     // parent process
@@ -50,13 +55,16 @@ int main(void) {
 
       int count = read(pipefd[0], buf, sizeof(buf));
       if(count == 0) { // remote end disconnected
-	printf("parent exiting\n");
+	printf("child has closed pipe - quitting\n");
 	break; 
       }
       
       printf("received >%s<\n", buf);
     }
   }
-  
+
+  printf ("waiting for child process to finish\n");
+  waitpid(childpid, NULL, 0);
+  printf ("child has exited\n");
   return EXIT_SUCCESS;
 }
